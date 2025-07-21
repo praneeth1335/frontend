@@ -12,10 +12,8 @@ import { friendsAPI, emailAPI } from "./services/api";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
-import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import LoadingSpinner from "./components/LoadingSpinner";
 import TransactionHistory from "./components/TransactionHistory";
-import ConfirmationPopup from "./components/ConfirmationPopup";
 
 // Main App component
 function App() {
@@ -53,16 +51,6 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/forgot-password"
-        element={
-          !isAuthenticated ? (
-            <ForgotPasswordPage />
-          ) : (
-            <Navigate to="/dashboard" />
-          )
-        }
-      />
-      <Route
         path="/dashboard"
         element={isAuthenticated ? <DashboardPage /> : <Navigate to="/login" />}
       />
@@ -89,11 +77,6 @@ export function EatSplit() {
   const [showTransactionHistory, setShowTransactionHistory] = useState(false);
   const [selectedFriendForHistory, setSelectedFriendForHistory] =
     useState(null);
-
-  // Confirmation popup states
-  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
-  const [friendToDelete, setFriendToDelete] = useState(null);
-  const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
 
   // Initialize theme from localStorage
   useEffect(() => {
@@ -276,7 +259,7 @@ export function EatSplit() {
     }
   };
 
-  const handleDeleteFriend = (id) => {
+  const handleDeleteFriend = async (id) => {
     const friend = friends.find((f) => f._id === id);
     if (!friend) return;
 
@@ -287,65 +270,50 @@ export function EatSplit() {
       return;
     }
 
-    // Show custom confirmation popup instead of browser alert
-    setFriendToDelete(friend);
-    setShowDeleteConfirmation(true);
-  };
+    if (window.confirm(`Are you sure you want to delete ${friend.name}?`)) {
+      try {
+        setError(null);
 
-  const confirmDeleteFriend = async () => {
-    if (!friendToDelete) return;
+        console.log("Deleting friend:", id);
+        const response = await friendsAPI.deleteFriend(id);
+        console.log("Delete response:", response);
 
-    try {
-      setError(null);
+        if (response.data && response.data.success) {
+          setFriends((prev) => prev.filter((f) => f._id !== id));
+          if (selectedId === id) {
+            setSelectedId(0);
+          }
 
-      console.log("Deleting friend:", friendToDelete._id);
-      const response = await friendsAPI.deleteFriend(friendToDelete._id);
-      console.log("Delete response:", response);
-
-      if (response.data && response.data.success) {
-        setFriends((prev) => prev.filter((f) => f._id !== friendToDelete._id));
-        if (selectedId === friendToDelete._id) {
-          setSelectedId(0);
-        }
-
-        // Refresh user data after deleting friend
-        try {
-          const refreshResult = await refreshUserData();
-          if (refreshResult && !refreshResult.success) {
-            console.warn(
-              "Failed to refresh user data after deleting friend:",
-              refreshResult.error
+          // Refresh user data after deleting friend
+          try {
+            const refreshResult = await refreshUserData();
+            if (refreshResult && !refreshResult.success) {
+              console.warn(
+                "Failed to refresh user data after deleting friend:",
+                refreshResult.error
+              );
+            }
+          } catch (refreshError) {
+            console.error(
+              "Error refreshing user data after deleting friend:",
+              refreshError
             );
           }
-        } catch (refreshError) {
-          console.error(
-            "Error refreshing user data after deleting friend:",
-            refreshError
-          );
+
+          console.log("Friend deleted successfully");
+        } else {
+          throw new Error(response.data?.message || "Failed to delete friend");
         }
-
-        console.log("Friend deleted successfully");
-      } else {
-        throw new Error(response.data?.message || "Failed to delete friend");
+      } catch (error) {
+        console.error("Error deleting friend:", error);
+        const errorMessage =
+          error.response?.data?.message ||
+          error.message ||
+          "Error deleting friend. Please try again.";
+        setError(errorMessage);
+        alert(errorMessage);
       }
-    } catch (error) {
-      console.error("Error deleting friend:", error);
-      const errorMessage =
-        error.response?.data?.message ||
-        error.message ||
-        "Error deleting friend. Please try again.";
-      setError(errorMessage);
-      alert(errorMessage);
-    } finally {
-      // Close confirmation popup
-      setShowDeleteConfirmation(false);
-      setFriendToDelete(null);
     }
-  };
-
-  const cancelDeleteFriend = () => {
-    setShowDeleteConfirmation(false);
-    setFriendToDelete(null);
   };
 
   const handleViewTransactionHistory = (friend) => {
@@ -370,7 +338,7 @@ export function EatSplit() {
       let message = "";
 
       if (balance > 0) {
-        subject = `Qunatify Reminder - You owe $${balance.toFixed(2)}`;
+        subject = `Bill Split Reminder - You owe $${balance.toFixed(2)}`;
         message = `Hi ${friend.name},
 
 Just a friendly reminder that you owe me $${balance.toFixed(
@@ -383,7 +351,7 @@ Thanks!
 Best regards,
 ${user.name}`;
       } else if (balance < 0) {
-        subject = `Qunatify Update - I owe you $${Math.abs(balance).toFixed(
+        subject = `Bill Split Update - I owe you $${Math.abs(balance).toFixed(
           2
         )}`;
         message = `Hi ${friend.name},
@@ -396,7 +364,7 @@ Thanks!
 Best regards,
 ${user.name}`;
       } else {
-        subject = `Qunatify Update - We're all settled up!`;
+        subject = `Bill Split Update - We're all settled up!`;
         message = `Hi ${friend.name},
 
 Great news! We're all settled up on our bill splits.
@@ -435,21 +403,15 @@ ${user.name}`;
   };
 
   const handleContactUs = () => {
-    alert("Contact us at: bspraneeth05@gmail.com\nPhone: +91 8712135034");
+    alert(
+      "Contact us at: bodapati.sai.praneeth@example.com\nPhone: +1 (555) 123-4567"
+    );
   };
 
-  // Show logout confirmation popup instead of browser confirm
-  const handleLogout = () => {
-    setShowLogoutConfirmation(true);
-  };
-
-  const confirmLogout = async () => {
-    setShowLogoutConfirmation(false);
-    await logout();
-  };
-
-  const cancelLogout = () => {
-    setShowLogoutConfirmation(false);
+  const handleLogout = async () => {
+    if (window.confirm("Are you sure you want to logout?")) {
+      await logout();
+    }
   };
 
   // Calculate analytics directly from the user object from AuthContext
@@ -467,17 +429,17 @@ ${user.name}`;
     <>
       {/* Header */}
       <header className="header">
-        <h1 className="header-title">Quantify</h1>
+        <h1 className="header-title">💰 Bill Split Manager</h1>
         <nav className="header-nav">
           <span className="user-greeting">Hello, {user?.name}!</span>
           <a href="#" onClick={handleContactUs}>
-            Contact Us
+            📞 Contact Us
           </a>
           <button className="theme-toggle" onClick={toggleTheme}>
-            {darkMode ? "Light" : "Dark"}
+            {darkMode ? "☀️" : "🌙"}
           </button>
           <button className="logout-btn" onClick={handleLogout}>
-            Logout
+            🚪 Logout
           </button>
         </nav>
       </header>
@@ -497,10 +459,10 @@ ${user.name}`;
 
         {/* Visual Analytics Section */}
         <section className="analytics-section">
-          <h2 className="analytics-title">Financial Overview</h2>
+          <h2 className="analytics-title">📊 Financial Overview</h2>
           <div className="analytics-grid">
             <div className="analytics-card">
-              <h3>Total Owed to You</h3>
+              <h3>💚 Total Owed to You</h3>
               <div
                 className={`analytics-value ${
                   totalOwedToYou > 0 ? "positive" : "neutral"
@@ -512,7 +474,7 @@ ${user.name}`;
             </div>
 
             <div className="analytics-card">
-              <h3>Total You Owe</h3>
+              <h3>💸 Total You Owe</h3>
               <div
                 className={`analytics-value ${
                   totalYouOwe > 0 ? "negative" : "neutral"
@@ -524,7 +486,7 @@ ${user.name}`;
             </div>
 
             <div className="analytics-card">
-              <h3>Net Balance</h3>
+              <h3>⚖️ Net Balance</h3>
               <div
                 className={`analytics-value ${
                   netBalance > 0
@@ -546,7 +508,7 @@ ${user.name}`;
             </div>
 
             <div className="analytics-card">
-              <h3>Total Friends</h3>
+              <h3>👥 Total Friends</h3>
               <div className="analytics-value neutral">{totalFriends}</div>
               <p className="analytics-description">Friends in your network</p>
             </div>
@@ -580,7 +542,8 @@ ${user.name}`;
       {/* Footer */}
       <footer className="footer">
         <p>
-          Developed by <strong>Bodapati Sai Praneeth</strong> | © 2024 Quantify
+          🚀 Developed by <strong>Bodapati Sai Praneeth</strong> | © 2024 Bill
+          Split Manager
         </p>
       </footer>
 
@@ -592,30 +555,6 @@ ${user.name}`;
           onClose={handleCloseTransactionHistory}
         />
       )}
-
-      {/* Custom Delete Confirmation Popup */}
-      <ConfirmationPopup
-        isOpen={showDeleteConfirmation}
-        title="🗑️ Delete Friend"
-        message={`Are you sure you want to delete ${friendToDelete?.name}? This action cannot be undone.`}
-        confirmText="Delete"
-        cancelText="Cancel"
-        onConfirm={confirmDeleteFriend}
-        onCancel={cancelDeleteFriend}
-        confirmButtonClass="button-danger"
-      />
-
-      {/* Custom Logout Confirmation Popup */}
-      <ConfirmationPopup
-        isOpen={showLogoutConfirmation}
-        title="🚪 Logout Confirmation"
-        message="Are you sure you want to logout? You will need to login again to access your account."
-        confirmText="Logout"
-        cancelText="Stay Logged In"
-        onConfirm={confirmLogout}
-        onCancel={cancelLogout}
-        confirmButtonClass="button-danger"
-      />
     </>
   );
 }
@@ -640,7 +579,7 @@ function FriendsList({
   if (!friendArray || friendArray.length === 0) {
     return (
       <div className="no-friends">
-        <p>No friends added yet</p>
+        <p>👥 No friends added yet</p>
         <p>Add your first friend to start splitting bills!</p>
       </div>
     );
@@ -691,14 +630,13 @@ function Friend({ friend, onSelect, onDelete, onMail, onViewHistory }) {
           className="button button-info"
           onClick={() => onViewHistory(friend)}
         >
-          <span>History</span>
+          <span>📊 History</span>
         </button>
         <button
           className="button button-warning"
           onClick={() => onMail(friend)}
-          style={{ color: "white" }}
         >
-          <span>Send Email</span>
+          <span>📧 Mail</span>
         </button>
         <button
           className={`button ${Math.abs(balance) === 0 ? "button-danger" : ""}`}
@@ -709,7 +647,7 @@ function Friend({ friend, onSelect, onDelete, onMail, onViewHistory }) {
             cursor: Math.abs(balance) > 0.01 ? "not-allowed" : "pointer",
           }}
         >
-          <span>Delete</span>
+          <span>🗑️ Delete</span>
         </button>
       </div>
     </li>
@@ -753,7 +691,7 @@ function FormAddFriend({ onAdd }) {
 
   return (
     <form className="form-add-friend" onSubmit={handleSubmit}>
-      <label>Friend Name</label>
+      <label>👤 Friend Name</label>
       <input
         type="text"
         value={name}
@@ -761,14 +699,14 @@ function FormAddFriend({ onAdd }) {
         placeholder="Enter friend's name"
         required
       />
-      <label>Image URL (Optional)</label>
+      <label>🖼️ Image URL (Optional)</label>
       <input
         type="text"
         value={url}
         onChange={(e) => setUrl(e.target.value)}
         placeholder="Enter image URL (optional)"
       />
-      <label>Email Address</label>
+      <label>📧 Email Address</label>
       <input
         type="email"
         value={email}
@@ -806,14 +744,11 @@ function FormSplitBill({ selectedId, friends, news, onForm }) {
           fontSize: "2rem",
           color: "var(--light-text-color)",
           background: "var(--light-card-bg)",
-          borderRadius: "25px",
+          borderRadius: "16px",
           border: "1px solid var(--light-card-border)",
-          backdropFilter: "blur(20px) brightness(1.1)",
-          boxShadow:
-            "0 12px 50px var(--light-shadow-color), var(--light-glow-effect)",
         }}
       >
-        <h2>Select a friend to split the bill with</h2>
+        <h2>🎯 Select a friend to split the bill with</h2>
         <p style={{ fontSize: "1.6rem", marginTop: "1rem", opacity: 0.7 }}>
           Choose someone from your friends list to get started!
         </p>
@@ -884,11 +819,11 @@ function FormSplitBill({ selectedId, friends, news, onForm }) {
   return (
     <form className="form-split-bill" onSubmit={handleSubmit}>
       <h2>
-        Split a bill with{" "}
+        💸 Split a bill with{" "}
         <span style={{ color: "var(--color-primary)" }}>{friend.name}</span>
       </h2>
 
-      <label>Description (Optional)</label>
+      <label>📝 Description (Optional)</label>
       <input
         type="text"
         value={description}
@@ -896,7 +831,7 @@ function FormSplitBill({ selectedId, friends, news, onForm }) {
         placeholder="e.g., Dinner at restaurant"
       />
 
-      <label>Bill Value</label>
+      <label>💰 Bill Value</label>
       <input
         type="number"
         value={billValue}
@@ -907,7 +842,7 @@ function FormSplitBill({ selectedId, friends, news, onForm }) {
         required
       />
 
-      <label>Your Expense</label>
+      <label>🧍‍♀️ Your Expense</label>
       <input
         type="number"
         value={yourExpense}
@@ -919,7 +854,7 @@ function FormSplitBill({ selectedId, friends, news, onForm }) {
         required
       />
 
-      <label>{friend.name}'s Expense</label>
+      <label>👫 {friend.name}'s Expense</label>
       <input
         type="number"
         value={friendExpense}
@@ -928,7 +863,7 @@ function FormSplitBill({ selectedId, friends, news, onForm }) {
         style={{ backgroundColor: "var(--light-input-bg)", opacity: 0.7 }}
       />
 
-      <label>Who's Paying?</label>
+      <label>🤑 Who's Paying?</label>
       <select onChange={onChange} value={whoPays}>
         <option value="user">You</option>
         <option value="friend">{friend.name}</option>

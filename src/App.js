@@ -358,7 +358,7 @@ export function EatSplit() {
     setShowTransactionHistory(false);
     setSelectedFriendForHistory(null);
     // Reload friends to get updated balances after viewing history
-    loadFriends(); // This will also trigger refreshUserData
+    // loadFriends(); // This will also trigger refreshUserData
   };
 
   const handleMailFriend = async (friend) => {

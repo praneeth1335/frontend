@@ -2,8 +2,7 @@ import axios from "axios";
 
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL:
-    "https://backend-27d1.onrender.com/api" || "http://localhost:5000/api",
+  baseURL: process.env.REACT_APP_API_URL || "http://localhost:5000/api",
   timeout: 10000,
   headers: {
     "Content-Type": "application/json",
@@ -25,24 +24,16 @@ api.interceptors.request.use(
 );
 
 // Response interceptor to handle common errors
-// api.js
 api.interceptors.response.use(
   (response) => {
     return response;
   },
   (error) => {
-    // Don't automatically redirect for login page errors
-    if (error.config.url.includes("/auth/login")) {
-      return Promise.reject(error);
-    }
-
     if (error.response?.status === 401) {
-      // Token expired or invalid - only handle if not on login page
-      if (!window.location.pathname.includes("/login")) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        window.location.href = "/login";
-      }
+      // Token expired or invalid
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      window.location.href = "/login";
     }
     return Promise.reject(error);
   }
@@ -56,6 +47,7 @@ export const authAPI = {
   getProfile: () => api.get("/auth/profile"),
   updateProfile: (userData) => api.put("/auth/profile", userData),
   forgotPassword: (email) => api.post("/auth/forgot-password", { email }),
+  verifyOTP: (data) => api.post("/auth/verify-otp", data),
   resetPassword: (resetData) => api.post("/auth/reset-password", resetData),
 };
 
@@ -88,3 +80,5 @@ export const emailAPI = {
 };
 
 export default api;
+
+

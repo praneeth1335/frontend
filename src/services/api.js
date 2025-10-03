@@ -76,9 +76,7 @@ export const transactionsAPI = {
 
 // Email API
 export const emailAPI = {
-  sendEmail: (emailData) => api.post("/email/send", emailData),
+  sendEmail: (emailData) => api.post("email/send", emailData),
 };
 
 export default api;
-
-
